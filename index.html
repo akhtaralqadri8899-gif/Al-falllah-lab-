@@ -1,1 +1,171 @@
-index.html
+
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الفلاح ہسپتال لیبارٹری ایپ</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body { font-family: sans-serif; direction: rtl; text-align: right; padding: 10px; background: #f0f4f8; }
+        .app-container { max-width: 800px; margin: auto; background: white; border-radius: 12px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: #1e3a8a; color: white; padding: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .section { padding: 15px; border-bottom: 1px solid #eee; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #eff6ff; color: #1e3a8a; }
+        .btn-group { display: flex; gap: 10px; padding: 20px; }
+        button { flex: 1; padding: 15px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn-pdf { background: #dc2626; }
+        .btn-wa { background: #16a34a; }
+        .result-input { width: 85%; padding: 6px; text-align: center; border: 1px solid #16a34a; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h1>الفلاح ہسپتال لیبارٹری، کچلاک</h1>
+        <p>رابطہ: 03108888780</p>
+    </div>
+
+    <div class="section">
+        <h3>مریض کی تفصیلات</h3>
+        <input type="text" id="pName" placeholder="مریض کا نام">
+        <input type="text" id="pID" placeholder="پیشنٹ آئی ڈی (ID)">
+        <div style="display: flex; gap: 10px;">
+            <input type="number" id="pAge" placeholder="عمر">
+            <select id="pGender">
+                <option value="Male">میل (Male)</option>
+                <option value="Female">فی میل (Female)</option>
+            </select>
+        </div>
+        <input type="text" id="pWA" placeholder="واٹس ایپ نمبر (جیسے 0310...)">
+    </div>
+
+    <div class="section">
+        <h3>ٹیسٹ سلیکشن</h3>
+        <select id="testSelect" onchange="loadTest()">
+            <option value="">-- ٹیسٹ منتخب کریں --</option>
+            <option value="CBC">CBC (Complete Blood Count)</option>
+            <option value="LFT">LFT (Liver Function Test)</option>
+            <option value="RFT">RFT (Renal Function Test)</option>
+            <option value="Lipid">Lipid Profile</option>
+            <option value="Thyroid">Thyroid Profile</option>
+            <option value="Sugar">Blood Sugar</option>
+        </select>
+        <div id="testArea"></div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn-pdf" onclick="savePDF()">PDF ڈاؤن لوڈ</button>
+        <button class="btn-wa" onclick="sendWhatsApp()">واٹس ایپ پر بھیجیں</button>
+    </div>
+</div>
+
+<script>
+    const tests = {
+        "CBC": [
+            { n: "Hemoglobin (Hb)", r: "13.5 - 17.5", u: "g/dL" },
+            { n: "TLC (WBC Count)", r: "4.0 - 11.0", u: "x10^3/uL" },
+            { n: "RBC Count", r: "4.5 - 5.5", u: "mill/uL" },
+            { n: "Platelets Count", r: "150 - 450", u: "x10^3/uL" },
+            { n: "HCT / PCV", r: "40 - 50", u: "%" },
+            { n: "MCV", r: "80 - 100", u: "fL" },
+            { n: "MCH", r: "27 - 32", u: "pg" },
+            { n: "MCHC", r: "32 - 36", u: "g/dL" },
+            { n: "RDW-CV", r: "11.5 - 14.5", u: "%" },
+            { n: "Neutrophils", r: "40 - 75", u: "%" },
+            { n: "Lymphocytes", r: "20 - 45", u: "%" },
+            { n: "Monocytes", r: "02 - 10", u: "%" },
+            { n: "Eosinophils", r: "01 - 06", u: "%" },
+            { n: "Basophils", r: "00 - 01", u: "%" }
+        ],
+        "LFT": [
+            { n: "Bilirubin Total", r: "0.1 - 1.2", u: "mg/dL" },
+            { n: "Bilirubin Direct", r: "0.0 - 0.3", u: "mg/dL" },
+            { n: "SGPT (ALT)", r: "Up to 42", u: "U/L" },
+            { n: "SGOT (AST)", r: "Up to 37", u: "U/L" },
+            { n: "Alkaline Phosphatase", r: "40 - 129", u: "U/L" }
+        ],
+        "RFT": [
+            { n: "Urea", r: "10 - 50", u: "mg/dL" },
+            { n: "Creatinine", r: "0.6 - 1.2", u: "mg/dL" },
+            { n: "Uric Acid", r: "3.5 - 7.2", u: "mg/dL" }
+        ],
+        "Lipid": [
+            { n: "Cholesterol Total", r: "Up to 200", u: "mg/dL" },
+            { n: "Triglycerides", r: "Up to 150", u: "mg/dL" },
+            { n: "HDL Cholesterol", r: "40 - 60", u: "mg/dL" },
+            { n: "LDL Cholesterol", r: "Up to 130", u: "mg/dL" }
+        ],
+        "Thyroid": [
+            { n: "T3 (Total)", r: "0.8 - 2.0", u: "ng/mL" },
+            { n: "T4 (Total)", r: "5.1 - 14.1", u: "ug/dL" },
+            { n: "TSH", r: "0.27 - 4.2", u: "uIU/mL" }
+        ],
+        "Sugar": [
+            { n: "Sugar Fasting", r: "70 - 110", u: "mg/dL" },
+            { n: "Sugar Random", r: "70 - 160", u: "mg/dL" }
+        ]
+    };
+
+    function loadTest() {
+        const key = document.getElementById("testSelect").value;
+        const area = document.getElementById("testArea");
+        if (!key) { area.innerHTML = ""; return; }
+
+        let html = `<table><tr><th>پیرامیٹر</th><th>رزلٹ</th><th>نارمل رینج</th></tr>`;
+        tests[key].forEach((item, i) => {
+            html += `<tr><td>${item.n}</td><td><input type="text" class="result-input" id="res_${i}"><br><small>${item.u}</small></td><td>${item.r}</td></tr>`;
+        });
+        html += `</table>`;
+        area.innerHTML = html;
+    }
+
+    function sendWhatsApp() {
+        let phone = document.getElementById("pWA").value;
+        const name = document.getElementById("pName").value;
+        const testKey = document.getElementById("testSelect").value;
+        
+        if (!phone) { alert("نمبر لکھیں!"); return; }
+        
+        // نمبر درست کرنا (0 کو 92 میں بدلنا)
+        if (phone.startsWith("0")) { phone = "92" + phone.substring(1); }
+
+        let msg = `*AL-FALLAH HOSPITAL LABORATORY*%0A*Patient:* ${name}%0A*Test:* ${testKey}%0A--------------------------%0A`;
+        tests[testKey].forEach((item, i) => {
+            const val = document.getElementById(`res_${i}`).value;
+            msg += `${item.n}: *${val}* ${item.u}%0A`;
+        });
+        msg += `--------------------------%0Aآپ کی رپورٹ تیار ہے۔`;
+
+        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    }
+
+    function savePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const testKey = document.getElementById("testSelect").value;
+        const name = document.getElementById("pName").value || "Patient";
+
+        doc.setFontSize(20);
+        doc.text("AL-FALLAH HOSPITAL LABORATORY", 105, 20, { align: "center" });
+        doc.setFontSize(12);
+        doc.text("KUCHLAK - Contact: 03108888780", 105, 28, { align: "center" });
+        doc.line(10, 32, 200, 32);
+
+        doc.text(`Patient: ${name}`, 15, 45);
+        doc.text(`Age/Gender: ${document.getElementById("pAge").value}/${document.getElementById("pGender").value}`, 15, 52);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 52);
+
+        const data = tests[testKey].map((item, i) => [item.n, document.getElementById(`res_${i}`).value + " " + item.u, item.r]);
+        doc.autoTable({ startY: 65, head: [['Parameter', 'Result', 'Normal Range']], body: data });
+        doc.save(`${name}_Report.pdf`);
+    }
+</script>
+</body>
+</html>
